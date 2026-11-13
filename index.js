@@ -1,6 +1,7 @@
+require("dotenv").config();
 
-const makeWASocket = require("@whiskeysockets/baileys").default;
 const {
+  default: makeWASocket,
   useMultiFileAuthState
 } = require("@whiskeysockets/baileys");
 
@@ -10,7 +11,7 @@ async function startBot() {
   const phone = process.env.PHONE_NUMBER;
 
   if (!phone) {
-    throw new Error("PHONE_NUMBER is missing!");
+    throw new Error("PHONE_NUMBER is missing");
   }
 
   const { state, saveCreds } =
@@ -24,20 +25,39 @@ async function startBot() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", ({ connection }) => {
+  let requested = false;
+
+  sock.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
+
+    if (
+      connection === "connecting" &&
+      !state.creds.registered &&
+      !requested
+    ) {
+      requested = true;
+
+      setTimeout(async () => {
+        try {
+          const code = await sock.requestPairingCode(phone);
+          console.log("NOVA PAIRING CODE:", code);
+        } catch (error) {
+          console.error("PAIRING ERROR:", error.message);
+        }
+      }, 3000);
+    }
+
     if (connection === "open") {
       console.log("NOVA-MD-BOT CONNECTED!");
     }
 
     if (connection === "close") {
-      console.log("WhatsApp connection closed.");
+      console.log(
+        "CONNECTION CLOSED:",
+        lastDisconnect?.error?.message
+      );
     }
   });
-
-  if (!state.creds.registered) {
-    const code = await sock.requestPairingCode(phone);
-    console.log("PAIRING CODE:", code);
-  }
 }
 
 startBot().catch(console.error);
