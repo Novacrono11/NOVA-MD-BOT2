@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -15,22 +17,27 @@ async function startBot() {
     browser: ["NOVA-MD-BOT", "Chrome", "1.0.0"]
   });
 
+  if (!state.creds.registered) {
+    const phone = process.env.PHONE_NUMBER;
+
+    if (!phone) {
+      console.log("PHONE_NUMBER is missing.");
+      return;
+    }
+
+    const code = await sock.requestPairingCode(phone);
+    console.log("NOVA-MD-BOT PAIRING CODE:", code);
+  }
+
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect } = update;
-
+  sock.ev.on("connection.update", ({ connection }) => {
     if (connection === "open") {
-      console.log("NOVA-MD-BOT connected successfully!");
+      console.log("NOVA-MD-BOT CONNECTED!");
     }
 
     if (connection === "close") {
-      const reconnect =
-        lastDisconnect?.error?.output?.statusCode !==
-        DisconnectReason.loggedOut;
-
-      if (reconnect) startBot();
-      else console.log("WhatsApp logged out. Reconnect manually.");
+      console.log("Connection closed.");
     }
   });
 }
